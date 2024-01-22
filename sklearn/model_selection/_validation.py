@@ -553,7 +553,7 @@ def _warn_or_raise_about_fit_failures(results, error_score):
         "X": ["array-like", "sparse matrix"],
         "y": ["array-like", None],
         "groups": ["array-like", None],
-        "scoring": [StrOptions(set(get_scorer_names())), callable, None],
+        "scoring": [StrOptions(set(get_scorer_names())), list, callable, None],
         "cv": ["cv_object"],
         "n_jobs": [Integral, None],
         "verbose": ["verbose"],
@@ -1505,7 +1505,7 @@ def _check_is_permutation(indices, n_samples):
         "n_jobs": [Integral, None],
         "random_state": ["random_state"],
         "verbose": ["verbose"],
-        "scoring": [StrOptions(set(get_scorer_names())), callable, None],
+        "scoring": [StrOptions(set(get_scorer_names())), list, callable, None],
         "fit_params": [dict, None],
     },
     prefer_skip_nested_validation=False,  # estimator is not validated yet
@@ -1523,6 +1523,7 @@ def permutation_test_score(
     verbose=0,
     scoring=None,
     fit_params=None,
+    return_all_folds=False,
 ):
     """Evaluate the significance of a cross-validated score with permutations.
 
@@ -1581,6 +1582,9 @@ def permutation_test_score(
 
         .. versionchanged:: 0.22
             `cv` default value if `None` changed from 3-fold to 5-fold.
+
+    return_all_folds : boolean, default=False
+        Whether to return scores for all folds.
 
     n_permutations : int, default=100
         Number of times to permute ``y``.
@@ -1660,13 +1664,14 @@ def permutation_test_score(
     X, y, groups = indexable(X, y, groups)
 
     cv = check_cv(cv, y, classifier=is_classifier(estimator))
-    scorer = check_scoring(estimator, scoring=scoring)
+
     random_state = check_random_state(random_state)
 
     # We clone the estimator to make sure that all the folds are
     # independent, and that it is pickle-able.
-    score = _permutation_test_score(
-        clone(estimator), X, y, groups, cv, scorer, fit_params=fit_params
+
+    main_score = _permutation_test_score(
+        clone(estimator), X, y, groups, cv, scoring, fit_params=fit_params, return_all_folds=return_all_folds
     )
     permutation_scores = Parallel(n_jobs=n_jobs, verbose=verbose)(
         delayed(_permutation_test_score)(
@@ -1675,28 +1680,58 @@ def permutation_test_score(
             _shuffle(y, groups, random_state),
             groups,
             cv,
-            scorer,
+            scoring,
             fit_params=fit_params,
+            return_all_folds = False,
         )
         for _ in range(n_permutations)
     )
-    permutation_scores = np.array(permutation_scores)
-    pvalue = (np.sum(permutation_scores >= score) + 1.0) / (n_permutations + 1)
-    return score, permutation_scores, pvalue
+    
+    if return_all_folds:
+        # Concatenate 
+        permutation_scores = {k: [d.get(k) for d in permutation_scores] for k in set().union(*permutation_scores)}
+    
+    return main_score, permutation_scores
 
 
-def _permutation_test_score(estimator, X, y, groups, cv, scorer, fit_params):
+def _permutation_test_score(estimator, X, y, groups, cv, scoring_name, fit_params, return_all_folds=False):
     """Auxiliary function for permutation_test_score"""
     # Adjust length of sample weights
     fit_params = fit_params if fit_params is not None else {}
-    avg_score = []
+
+    # Initialize empty dict 
+    all_scores = {}
+
+    if isinstance(scoring_name, list):
+        scoring_funcs = [check_scoring(estimator, scoring=s) for s in scoring_name]
+        for i in range(len(scoring_name)):
+            all_scores[scoring_name[i]] = []
+    else:
+        scoring_func = check_scoring(estimator, scoring=scoring_name)
+        all_scores[scoring_name] = []
+    
     for train, test in cv.split(X, y, groups):
+
+        # Partition the train/test data
         X_train, y_train = _safe_split(estimator, X, y, train)
         X_test, y_test = _safe_split(estimator, X, y, test, train)
-        fit_params = _check_method_params(X, params=fit_params, indices=train)
+        # fit_params = _check_method_params(X, params=fit_params, indices=train)
+
+        # Fit the model
         estimator.fit(X_train, y_train, **fit_params)
-        avg_score.append(scorer(estimator, X_test, y_test))
-    return np.mean(avg_score)
+
+        # If multiple scorers are passed, iterate over the scorers individually
+        if isinstance(scoring_name, list):
+            for i in range(len(scoring_name)):
+                all_scores[scoring_name[i]].append(scoring_funcs[i](estimator, X_test, y_test))
+        else:
+            all_scores[scoring_name].append(scoring_func(estimator, X_test, y_test))
+        
+        # fold_scores.append(scorer(estimator, X_test, y_test))
+    if return_all_folds:
+        return all_scores
+    else:
+        return {k: np.mean(v) for k, v in all_scores.items()}
 
 
 def _shuffle(y, groups, random_state):
@@ -1719,7 +1754,7 @@ def _shuffle(y, groups, random_state):
         "groups": ["array-like", None],
         "train_sizes": ["array-like"],
         "cv": ["cv_object"],
-        "scoring": [StrOptions(set(get_scorer_names())), callable, None],
+        "scoring": [StrOptions(set(get_scorer_names())), callable, list, None],
         "exploit_incremental_learning": ["boolean"],
         "n_jobs": [Integral, None],
         "pre_dispatch": [Integral, str],
@@ -2148,7 +2183,7 @@ def _incremental_fit_estimator(
         "param_range": ["array-like"],
         "groups": ["array-like", None],
         "cv": ["cv_object"],
-        "scoring": [StrOptions(set(get_scorer_names())), callable, None],
+        "scoring": [StrOptions(set(get_scorer_names())), list, callable, None],
         "n_jobs": [Integral, None],
         "pre_dispatch": [Integral, str],
         "verbose": ["verbose"],
