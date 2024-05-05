@@ -1673,6 +1673,10 @@ def permutation_test_score(
     main_score = _permutation_test_score(
         clone(estimator), X, y, groups, cv, scoring, fit_params=fit_params, return_all_folds=return_all_folds
     )
+
+    if n_permutations == 0:
+        return main_score, np.array([])
+
     permutation_scores = Parallel(n_jobs=n_jobs, verbose=verbose)(
         delayed(_permutation_test_score)(
             clone(estimator),
