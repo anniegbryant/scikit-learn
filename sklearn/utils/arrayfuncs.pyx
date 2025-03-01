@@ -1,7 +1,4 @@
-"""
-The :mod:`sklearn.utils.arrayfuncs` module includes a small collection of auxiliary
-functions that operate on arrays.
-"""
+"""A small collection of auxiliary functions that operate on arrays."""
 
 from cython cimport floating
 from libc.math cimport fabs
@@ -14,6 +11,7 @@ ctypedef fused real_numeric:
     short
     int
     long
+    long long
     float
     double
 
@@ -23,6 +21,25 @@ def min_pos(const floating[:] X):
 
     Returns the maximum representable value of the input dtype if none of the
     values are positive.
+
+    Parameters
+    ----------
+    X : ndarray of shape (n,)
+        Input array.
+
+    Returns
+    -------
+    min_val : float
+        The smallest positive value in the array, or the maximum representable value
+         of the input dtype if no positive values are found.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from sklearn.utils.arrayfuncs import min_pos
+    >>> X = np.array([0, -1, 2, 3, -4, 5])
+    >>> min_pos(X)
+    2.0
     """
     cdef Py_ssize_t i
     cdef floating min_val = FLT_MAX if floating is float else DBL_MAX

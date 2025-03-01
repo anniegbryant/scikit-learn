@@ -2,15 +2,111 @@
 
 .. currentmodule:: sklearn
 
+.. _release_notes_1_4:
+
+===========
+Version 1.4
+===========
+
+For a short description of the main highlights of the release, please refer to
+:ref:`sphx_glr_auto_examples_release_highlights_plot_release_highlights_1_4_0.py`.
+
+.. include:: changelog_legend.inc
+
+.. _changes_1_4_2:
+
+Version 1.4.2
+=============
+
+**April 2024**
+
+This release only includes support for numpy 2.
+
 .. _changes_1_4_1:
 
 Version 1.4.1
 =============
 
-**In Development**
+**February 2024**
+
+Changed models
+--------------
+
+- |API| The `tree_.value` attribute in :class:`tree.DecisionTreeClassifier`,
+  :class:`tree.DecisionTreeRegressor`, :class:`tree.ExtraTreeClassifier` and
+  :class:`tree.ExtraTreeRegressor` changed from a weighted absolute count
+  of number of samples to a weighted fraction of the total number of samples.
+  :pr:`27639` by :user:`Samuel Ronsin <samronsin>`.
+
+Metadata Routing
+----------------
+
+- |FIX| Fix routing issue with :class:`~compose.ColumnTransformer` when used
+  inside another meta-estimator.
+  :pr:`28188` by `Adrin Jalali`_.
+
+- |Fix| No error is raised when no metadata is passed to a metaestimator that
+  includes a sub-estimator which doesn't support metadata routing.
+  :pr:`28256` by `Adrin Jalali`_.
+
+- |Fix| Fix :class:`multioutput.MultiOutputRegressor` and
+  :class:`multioutput.MultiOutputClassifier` to work with estimators that don't
+  consume any metadata when metadata routing is enabled.
+  :pr:`28240` by `Adrin Jalali`_.
+
+DataFrame Support
+-----------------
+
+- |Enhancement| |Fix| Pandas and Polars dataframe are validated directly without
+  ducktyping checks.
+  :pr:`28195` by `Thomas Fan`_.
+
+Changes impacting many modules
+------------------------------
+
+- |Efficiency| |Fix| Partial revert of :pr:`28191` to avoid a performance regression for
+  estimators relying on euclidean pairwise computation with
+  sparse matrices. The impacted estimators are:
+
+  - :func:`sklearn.metrics.pairwise_distances_argmin`
+  - :func:`sklearn.metrics.pairwise_distances_argmin_min`
+  - :class:`sklearn.cluster.AffinityPropagation`
+  - :class:`sklearn.cluster.Birch`
+  - :class:`sklearn.cluster.SpectralClustering`
+  - :class:`sklearn.neighbors.KNeighborsClassifier`
+  - :class:`sklearn.neighbors.KNeighborsRegressor`
+  - :class:`sklearn.neighbors.RadiusNeighborsClassifier`
+  - :class:`sklearn.neighbors.RadiusNeighborsRegressor`
+  - :class:`sklearn.neighbors.LocalOutlierFactor`
+  - :class:`sklearn.neighbors.NearestNeighbors`
+  - :class:`sklearn.manifold.Isomap`
+  - :class:`sklearn.manifold.TSNE`
+  - :func:`sklearn.manifold.trustworthiness`
+
+  :pr:`28235` by :user:`Julien Jerphanion <jjerphan>`.
+
+- |Fix| Fixes a bug for all scikit-learn transformers when using `set_output` with
+  `transform` set to `pandas` or `polars`. The bug could lead to wrong naming of the
+  columns of the returned dataframe.
+  :pr:`28262` by :user:`Guillaume Lemaitre <glemaitre>`.
+
+- |Fix| When users try to use a method in :class:`~ensemble.StackingClassifier`,
+  :class:`~ensemble.StackingClassifier`, :class:`~ensemble.StackingClassifier`,
+  :class:`~feature_selection.SelectFromModel`, :class:`~feature_selection.RFE`,
+  :class:`~semi_supervised.SelfTrainingClassifier`,
+  :class:`~multiclass.OneVsOneClassifier`, :class:`~multiclass.OutputCodeClassifier` or
+  :class:`~multiclass.OneVsRestClassifier` that their sub-estimators don't implement,
+  the `AttributeError` now reraises in the traceback.
+  :pr:`28167` by :user:`Stefanie Senger <StefanieSenger>`.
 
 Changelog
 ---------
+
+:mod:`sklearn.calibration`
+..........................
+
+- |Fix| `calibration.CalibratedClassifierCV` supports :term:`predict_proba` with
+  float32 output from the inner estimator. :pr:`28247` by `Thomas Fan`_.
 
 :mod:`sklearn.cluster`
 ......................
@@ -24,17 +120,95 @@ Changelog
   larger than the number of non-duplicate samples.
   :pr:`28165` by :user:`Jérémie du Boisberranger <jeremiedbb>`.
 
+:mod:`sklearn.compose`
+......................
+
+- |Fix| :class:`compose.ColumnTransformer` now transforms into a polars dataframe when
+  `verbose_feature_names_out=True` and the transformers internally used several times
+  the same columns. Previously, it would raise a due to duplicated column names.
+  :pr:`28262` by :user:`Guillaume Lemaitre <glemaitre>`.
+
+:mod:`sklearn.ensemble`
+.......................
+
+- |Fix| :class:`HistGradientBoostingClassifier` and
+  :class:`HistGradientBoostingRegressor` when fitted on `pandas` `DataFrame`
+  with extension dtypes, for example `pd.Int64Dtype`
+  :pr:`28385` by :user:`Loïc Estève <lesteve>`.
+
+- |Fix| Fixes error message raised by :class:`ensemble.VotingClassifier` when the
+  target is multilabel or multiclass-multioutput in a DataFrame format.
+  :pr:`27702` by :user:`Guillaume Lemaitre <glemaitre>`.
+
+:mod:`sklearn.impute`
+.....................
+
+- |Fix|: :class:`impute.SimpleImputer` now raises an error in `.fit` and
+  `.transform` if `fill_value` can not be cast to input value dtype with
+  `casting='same_kind'`.
+  :pr:`28365` by :user:`Leo Grinsztajn <LeoGrin>`.
+
+:mod:`sklearn.inspection`
+.........................
+
+- |Fix| :func:`inspection.permutation_importance` now handles properly `sample_weight`
+  together with subsampling (i.e. `max_features` < 1.0).
+  :pr:`28184` by :user:`Michael Mayer <mayer79>`.
+
+:mod:`sklearn.linear_model`
+...........................
+
+- |Fix| :class:`linear_model.ARDRegression` now handles pandas input types
+  for `predict(X, return_std=True)`.
+  :pr:`28377` by :user:`Eddie Bergman <eddiebergman>`.
+
+:mod:`sklearn.preprocessing`
+............................
+
+- |Fix| make :class:`preprocessing.FunctionTransformer` more lenient and overwrite
+  output column names with the `get_feature_names_out` in the following cases:
+  (i) the input and output column names remain the same (happen when using NumPy
+  `ufunc`); (ii) the input column names are numbers; (iii) the output will be set to
+  Pandas or Polars dataframe.
+  :pr:`28241` by :user:`Guillaume Lemaitre <glemaitre>`.
+
+- |Fix| :class:`preprocessing.FunctionTransformer` now also warns when `set_output`
+  is called with `transform="polars"` and `func` does not return a Polars dataframe or
+  `feature_names_out` is not specified.
+  :pr:`28263` by :user:`Guillaume Lemaitre <glemaitre>`.
+
+- |Fix| :class:`preprocessing.TargetEncoder` no longer fails when
+  `target_type="continuous"` and the input is read-only. In particular, it now
+  works with pandas copy-on-write mode enabled.
+  :pr:`28233` by :user:`John Hopfensperger <s-banach>`.
+
+:mod:`sklearn.tree`
+...................
+
+- |Fix| :class:`tree.DecisionTreeClassifier` and
+  :class:`tree.DecisionTreeRegressor` are handling missing values properly. The internal
+  criterion was not initialized when no missing values were present in the data, leading
+  to potentially wrong criterion values.
+  :pr:`28295` by :user:`Guillaume Lemaitre <glemaitre>` and
+  :pr:`28327` by :user:`Adam Li <adam2392>`.
+
+:mod:`sklearn.utils`
+....................
+
+- |Enhancement| |Fix| :func:`utils.metaestimators.available_if` now reraises the error
+  from the `check` function as the cause of the `AttributeError`.
+  :pr:`28198` by `Thomas Fan`_.
+
+- |Fix| :func:`utils._safe_indexing` now raises a `ValueError` when `X` is a Python list
+  and `axis=1`, as documented in the docstring.
+  :pr:`28222` by :user:`Guillaume Lemaitre <glemaitre>`.
+
 .. _changes_1_4:
 
 Version 1.4.0
 =============
 
 **January 2024**
-
-For a short description of the main highlights of the release, please refer to
-:ref:`sphx_glr_auto_examples_release_highlights_plot_release_highlights_1_4_0.py`.
-
-.. include:: changelog_legend.inc
 
 Changed models
 --------------
@@ -49,7 +223,7 @@ random sampling procedures.
   solvers `"lbfgs"` and `"newton-cg"`. Both solvers can now reach much higher precision
   for the coefficients depending on the specified `tol`. Additionally, lbfgs can
   make better use of `tol`, i.e., stop sooner or reach higher precision.
-  Note: The lbfgs is the default solver, so this change might effect many models.
+  Note: The lbfgs is the default solver, so this change might affect many models.
   This change also means that with this new version of scikit-learn, the resulting
   coefficients `coef_` and `intercept_` of your models will change for these two
   solvers (when fit on the same data again). The amount of change depends on the
@@ -66,7 +240,7 @@ Changes impacting all modules
   `set_output(transform="polars")`.
   :pr:`27315` by `Thomas Fan`_.
 
-- |Enhancement| All estimators now recognizes the column names from any dataframe
+- |Enhancement| All estimators now recognize the column names from any dataframe
   that adopts the
   `DataFrame Interchange Protocol <https://data-apis.org/dataframe-protocol/latest/purpose_and_scope.html>`__.
   Dataframes that return a correct representation through `np.asarray(df)` is expected
@@ -87,7 +261,7 @@ Changes impacting all modules
 Metadata Routing
 ----------------
 
-The following models now support metadata routing in one or more or their
+The following models now support metadata routing in one or more of their
 methods. Refer to the :ref:`Metadata Routing User Guide <metadata_routing>` for
 more details.
 
@@ -219,7 +393,7 @@ Support for Array API
 ---------------------
 
 Several estimators and functions support the
-`Array API <https://data-apis.org/array-api/latest/>`_. Such changes allows for using
+`Array API <https://data-apis.org/array-api/latest/>`_. Such changes allow for using
 the estimators and functions with other libraries such as JAX, CuPy, and PyTorch.
 This therefore enables some GPU-accelerated computations.
 
@@ -313,7 +487,7 @@ Changelog
 
 - |Fix| Fixes a bug in :class:`cluster.OPTICS` where the cluster correction based
   on predecessor was not using the right indexing. It would lead to inconsistent results
-  depedendent on the order of the data.
+  dependent on the order of the data.
   :pr:`26459` by :user:`Haoying Zhang <stevezhang1999>` and
   :user:`Guillaume Lemaitre <glemaitre>`.
 
@@ -441,7 +615,7 @@ Changelog
   :pr:`26391` by `Thomas Fan`_.
 
 - |MajorFeature| :class:`ensemble.HistGradientBoostingClassifier` and
-  :class:`ensemble.HistGradientBoostingRegressor` supports
+  :class:`ensemble.HistGradientBoostingRegressor` support
   `categorical_features="from_dtype"`, which treats columns with Pandas or
   Polars Categorical dtype as categories in the algorithm.
   `categorical_features="from_dtype"` will become the default in v1.6.
@@ -493,10 +667,6 @@ Changelog
   :class:`ensemble.ExtraTreesClassifier` and :class:`ensemble.ExtraTreesRegressor`,
   which allows to retrieve the training sample indices used for each tree estimator.
   :pr:`26736` by :user:`Adam Li <adam2392>`.
-
-- |Efficiency| Improves runtime of `predict` of
-  :class:`ensemble.HistGradientBoostingClassifier` by avoiding to call `predict_proba`.
-  :pr:`27844` by :user:`Christian Lorentzen <lorentzenchr>`.
 
 - |Fix| Fixes :class:`ensemble.IsolationForest` when the input is a sparse matrix and
   `contamination` is set to a float value.
@@ -570,7 +740,7 @@ Changelog
   type for subclasses.
   :pr:`27675` by :user:`John Cant <johncant>`.
 
-- |API| :class:`inspection.DecisionBoundaryDisplay` raise an `AttributeError` instead
+- |API| :class:`inspection.DecisionBoundaryDisplay` raises an `AttributeError` instead
   of a `ValueError` when an estimator does not implement the requested response method.
   :pr:`27291` by :user:`Guillaume Lemaitre <glemaitre>`.
 
@@ -632,8 +802,8 @@ Changelog
 
 - |Enhancement| Improve the rendering of the plot obtained with the
   :class:`metrics.PrecisionRecallDisplay` and :class:`metrics.RocCurveDisplay`
-  classes. the x- and y-axis limits are set to [0, 1] and the aspect ratio between
-  both axis is set to be 1 to get a square plot.
+  classes. The x- and y-axis limits are set to [0, 1] and the aspect ratio between
+  both axes is set to be 1 to get a square plot.
   :pr:`26366` by :user:`Mojdeh Rastgoo <mrastgoo>`.
 
 - |Enhancement| Added `neg_root_mean_squared_log_error_scorer` as scorer
@@ -656,7 +826,7 @@ Changelog
 
 - |Fix| :func:`metrics.make_scorer` now raises an error when using a regressor on a
   scorer requesting a non-thresholded decision function (from `decision_function` or
-  `predict_proba`). Such scorer are specific to classification.
+  `predict_proba`). Such scorers are specific to classification.
   :pr:`26840` by :user:`Guillaume Lemaitre <glemaitre>`.
 
 - |Fix| :meth:`metrics.DetCurveDisplay.from_predictions`,
@@ -717,7 +887,7 @@ Changelog
   :pr:`23317` by :user:`Bharat Raghunathan <bharatr21>`.
 
 - |Fix| :meth:`neighbors.KNeighborsClassifier.predict` and
-  :meth:`neighbors.KNeighborsClassifier.predict_proba` now raises an error when the
+  :meth:`neighbors.KNeighborsClassifier.predict_proba` now raise an error when the
   weights of all neighbors of some sample are zero. This can happen when `weights`
   is a user-defined function.
   :pr:`26410` by :user:`Yao Xiao <Charlie-XIAO>`.
@@ -823,8 +993,7 @@ Changelog
   Use `-np.logaddexp(0, -x)` instead.
   :pr:`27544` by :user:`Christian Lorentzen <lorentzenchr>`.
 
-Code and Documentation Contributors
------------------------------------
+.. rubric:: Code and documentation contributors
 
 Thanks to everyone who has contributed to the maintenance and improvement of
 the project since version 1.3, including:

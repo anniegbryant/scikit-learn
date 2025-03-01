@@ -1,9 +1,7 @@
 """Unsupervised evaluation metrics."""
 
-# Authors: Robert Layton <robertlayton@gmail.com>
-#          Arnaud Fouchet <foucheta@gmail.com>
-#          Thierry Guillemot <thierry.guillemot.work@gmail.com>
-# License: BSD 3 clause
+# Authors: The scikit-learn developers
+# SPDX-License-Identifier: BSD-3-Clause
 
 
 import functools
@@ -138,7 +136,7 @@ def silhouette_score(
             X, labels = X[indices].T[indices].T, labels[indices]
         else:
             X, labels = X[indices], labels[indices]
-    return np.mean(silhouette_samples(X, labels, metric=metric, **kwds))
+    return float(np.mean(silhouette_samples(X, labels, metric=metric, **kwds)))
 
 
 def _silhouette_reduce(D_chunk, start, labels, label_freqs):
@@ -264,6 +262,17 @@ def silhouette_samples(X, labels, *, metric="euclidean", **kwds):
 
     .. [2] `Wikipedia entry on the Silhouette Coefficient
        <https://en.wikipedia.org/wiki/Silhouette_(clustering)>`_
+
+    Examples
+    --------
+    >>> from sklearn.metrics import silhouette_samples
+    >>> from sklearn.datasets import make_blobs
+    >>> from sklearn.cluster import KMeans
+    >>> X, y = make_blobs(n_samples=50, random_state=42)
+    >>> kmeans = KMeans(n_clusters=3, random_state=42)
+    >>> labels = kmeans.fit_predict(X)
+    >>> silhouette_samples(X, labels)
+    array([...])
     """
     X, labels = check_X_y(X, labels, accept_sparse=["csr"])
 
@@ -343,6 +352,16 @@ def calinski_harabasz_score(X, labels):
     .. [1] `T. Calinski and J. Harabasz, 1974. "A dendrite method for cluster
        analysis". Communications in Statistics
        <https://www.tandfonline.com/doi/abs/10.1080/03610927408827101>`_
+
+    Examples
+    --------
+    >>> from sklearn.datasets import make_blobs
+    >>> from sklearn.cluster import KMeans
+    >>> from sklearn.metrics import calinski_harabasz_score
+    >>> X, _ = make_blobs(random_state=0)
+    >>> kmeans = KMeans(n_clusters=3, random_state=0,).fit(X)
+    >>> calinski_harabasz_score(X, kmeans.labels_)
+    114.8...
     """
     X, labels = check_X_y(X, labels)
     le = LabelEncoder()
@@ -361,7 +380,7 @@ def calinski_harabasz_score(X, labels):
         extra_disp += len(cluster_k) * np.sum((mean_k - mean) ** 2)
         intra_disp += np.sum((cluster_k - mean_k) ** 2)
 
-    return (
+    return float(
         1.0
         if intra_disp == 0.0
         else extra_disp * (n_samples - n_labels) / (intra_disp * (n_labels - 1.0))
@@ -410,6 +429,14 @@ def davies_bouldin_score(X, labels):
        <https://ieeexplore.ieee.org/document/4766909>`__.
        IEEE Transactions on Pattern Analysis and Machine Intelligence.
        PAMI-1 (2): 224-227
+
+    Examples
+    --------
+    >>> from sklearn.metrics import davies_bouldin_score
+    >>> X = [[0, 1], [1, 1], [3, 4]]
+    >>> labels = [0, 0, 1]
+    >>> davies_bouldin_score(X, labels)
+    0.12...
     """
     X, labels = check_X_y(X, labels)
     le = LabelEncoder()
@@ -434,4 +461,4 @@ def davies_bouldin_score(X, labels):
     centroid_distances[centroid_distances == 0] = np.inf
     combined_intra_dists = intra_dists[:, None] + intra_dists
     scores = np.max(combined_intra_dists / centroid_distances, axis=1)
-    return np.mean(scores)
+    return float(np.mean(scores))
