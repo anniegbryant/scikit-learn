@@ -1435,7 +1435,7 @@ def _check_is_permutation(indices, n_samples):
         "y": ["array-like", None],
         "groups": ["array-like", None],
         "cv": ["cv_object"],
-        "n_permutations": [Interval(Integral, 1, None, closed="left")],
+        "n_permutations": [Interval(Integral, 0, None, closed="left")],
         "n_jobs": [Integral, None],
         "random_state": ["random_state"],
         "verbose": ["verbose"],
@@ -1457,6 +1457,7 @@ def permutation_test_score(
     verbose=0,
     scoring=None,
     params=None,
+    return_all_folds=False,
 ):
     """Evaluate the significance of a cross-validated score with permutations.
 
@@ -1520,6 +1521,15 @@ def permutation_test_score(
         Refer :ref:`User Guide <cross_validation>` for the various
         cross-validation strategies that can be used here.
 
+<<<<<<< HEAD
+=======
+        .. versionchanged:: 0.22
+            `cv` default value if `None` changed from 3-fold to 5-fold.
+
+    return_all_folds : boolean, default=False
+        Whether to return scores for all folds.
+
+>>>>>>> 3b91355a1d (Allow permutation testing to return all fold scores)
     n_permutations : int, default=100
         Number of times to permute ``y``.
 
@@ -1660,7 +1670,7 @@ def permutation_test_score(
 
     # We clone the estimator to make sure that all the folds are
     # independent, and that it is pickle-able.
-    score = _permutation_test_score(
+    main_score = _permutation_test_score(
         clone(estimator),
         X,
         y,
@@ -1669,27 +1679,40 @@ def permutation_test_score(
         split_params=routed_params.splitter.split,
         fit_params=routed_params.estimator.fit,
         score_params=routed_params.scorer.score,
+        return_all_folds=return_all_folds,
     )
-    permutation_scores = Parallel(n_jobs=n_jobs, verbose=verbose)(
-        delayed(_permutation_test_score)(
-            clone(estimator),
-            X,
-            _shuffle(y, groups, random_state),
-            cv,
-            scorer,
-            split_params=routed_params.splitter.split,
-            fit_params=routed_params.estimator.fit,
-            score_params=routed_params.scorer.score,
+
+    if n_permutations > 0:
+        permutation_scores = Parallel(n_jobs=n_jobs, verbose=verbose)(
+            delayed(_permutation_test_score)(
+                clone(estimator),
+                X,
+                _shuffle(y, groups, random_state),
+                cv,
+                scorer,
+                split_params=routed_params.splitter.split,
+                fit_params=routed_params.estimator.fit,
+                score_params=routed_params.scorer.score
+            )
+            for _ in range(n_permutations)
         )
-        for _ in range(n_permutations)
-    )
-    permutation_scores = np.array(permutation_scores)
-    pvalue = (np.sum(permutation_scores >= score) + 1.0) / (n_permutations + 1)
-    return score, permutation_scores, pvalue
+        permutation_scores = np.array(permutation_scores)
+
+        # Compute p-values
+        if return_all_folds: 
+            pvalue = (np.sum(np.mean(permutation_scores, axis=1) >= np.mean(main_score)) + 1.0) / (n_permutations + 1)
+        else:
+            pvalue = (np.sum(permutation_scores >= main_score) + 1.0) / (n_permutations + 1)
+
+    else: 
+        permutation_scores = [] 
+        pvalue = np.nan
+
+    return main_score, permutation_scores, pvalue
 
 
 def _permutation_test_score(
-    estimator, X, y, cv, scorer, split_params, fit_params, score_params
+    estimator, X, y, cv, scorer, split_params, fit_params, score_params, return_all_folds=False
 ):
     """Auxiliary function for permutation_test_score"""
     # Adjust length of sample weights
@@ -1704,7 +1727,11 @@ def _permutation_test_score(
         score_params_test = _check_method_params(X, params=score_params, indices=test)
         estimator.fit(X_train, y_train, **fit_params_train)
         avg_score.append(scorer(estimator, X_test, y_test, **score_params_test))
-    return np.mean(avg_score)
+    
+    if return_all_folds:
+        return np.array(avg_score)
+    else:
+        return np.mean(avg_score)
 
 
 def _shuffle(y, groups, random_state):
