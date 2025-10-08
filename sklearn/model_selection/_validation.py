@@ -1700,7 +1700,7 @@ def permutation_test_score(
 
         # Compute p-values
         if return_all_folds: 
-            pvalue = (np.sum(np.mean(permutation_scores, axis=1) >= np.mean(main_score)) + 1.0) / (n_permutations + 1)
+            pvalue = (np.sum(np.mean(permutation_scores) >= np.mean(main_score)) + 1.0) / (n_permutations + 1)
         else:
             pvalue = (np.sum(permutation_scores >= main_score) + 1.0) / (n_permutations + 1)
 
